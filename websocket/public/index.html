@@ -1,0 +1,17 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<title>Test</title>
+	</head>
+	<body>
+		<p id="message">test</p>
+		<script src="/socket.io/socket.io.js"></script>
+		<script>
+			var socket = io();
+			socket.on('message', function(msg) {
+				console.log(msg);
+				document.getElementById("message").innerHTML = msg;
+			});
+		</script>
+	</body>
+</html>
