@@ -24,7 +24,8 @@ def on_close(ws):
 def on_open(ws):
     print("WEBSOCKET CONNECTION OPENED")
 
-ws = websocket.create_connection("wss://localhost:8080", sslopt={"cert_reqs": ssl.CERT_NONE});
+ws = websocket.create_connection("ws://localhost:8090");
+#ws = websocket.create_connection("wss://localhost:8080", sslopt={"cert_reqs": ssl.CERT_NONE});
 #ws.on_open = on_open
 #ws.run_forever()
 
@@ -47,11 +48,11 @@ hx.reset()
 hx.tare()
 
 prev_val = 0
-alpha = 0.25
+alpha = 0.2
 val = 0
 beta = 1 - alpha
 
-stability_num = 4
+stability_num = 5
 
 state = State.STABLE
 values = []
@@ -60,7 +61,7 @@ stable_val = 0
 while True:
     try:
         prev_val = val
-        val = alpha * prev_val + beta * hx.get_weight(2)
+        val = alpha * prev_val + beta * hx.get_weight(1)
         #prev_val = val
         #print val
         #print round(val/10)*10
