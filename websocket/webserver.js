@@ -18,12 +18,21 @@ setInterval( function() {
 	console.log(msg);
 }, 1000);
 */
+const fs = require('fs');
 const WebSocket = require('ws');
 const https = require('https');
 
 //const server = new https.createServer({
 
-const wss = new WebSocket.Server({port: 8080});
+const server = new https.createServer({
+	cert: fs.readFileSync('/home/pi/cert.pem'),
+	key: fs.readFileSync('/home/pi/key.pem'),
+	passphrase: "sublimate"
+});
+
+const wss = new WebSocket.Server({server});
+
+const clients = {};
 
 function lookupBarcode(upc) {
 	https.get('https://api.upcitemdb.com/prod/trial/lookup?upc=' + upc, (resp) => {
@@ -46,8 +55,16 @@ function lookupBarcode(upc) {
 	});
 }
 
-function handleEvt(evt) {
+function registerClient(ws, identifier) {
+	clients[identifier] = ws;
+}
+
+
+function handleEvt(ws, evt) {
 	switch(evt.type) {
+		case "NEW_CLIENT":
+			registerClient(evt.value);
+			break;
 		case "BARCODE_SCANNED":
 			lookupBarcode(evt.value);
 			break;
@@ -58,7 +75,7 @@ wss.on('connection', function connection(ws) {
 	ws.on('message', function incoming(message) {
 		console.log('received: %s', message);
 		evt = JSON.parse(message);
-		handleEvt(evt);
+		handleEvt(ws,evt);
 	});
 	/*setInterval( function() {
 		var msg = Math.random();
@@ -66,6 +83,8 @@ wss.on('connection', function connection(ws) {
 		console.log('sent: %s', msg);
 	});*/
 });
+
+server.listen(8080);
 /*
 setInterval( function() {
 	var msg = Math.random();

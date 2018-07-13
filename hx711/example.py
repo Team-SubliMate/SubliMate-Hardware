@@ -10,6 +10,7 @@ except ImportError:
 import time
 from hx711 import HX711
 from enum import Enum
+import ssl
 
 def on_message(ws, message):
     print(message)
@@ -23,7 +24,7 @@ def on_close(ws):
 def on_open(ws):
     print("WEBSOCKET CONNECTION OPENED")
 
-ws = websocket.create_connection("ws://localhost:8080");
+ws = websocket.create_connection("wss://localhost:8080", sslopt={"cert_reqs": ssl.CERT_NONE});
 #ws.on_open = on_open
 #ws.run_forever()
 
@@ -78,10 +79,8 @@ while True:
                     if abs(v - val) > 20:
                         state = State.MEASURE
             if state == State.STABLE:
-                #print 'value changed by:'
                 roundedVal = ((val - stable_val)/10)*10
                 if abs(roundedVal) > 10:
-                #print round((val - stable_val)/10)*10
                     ws.send(json.dumps({"type": "WEIGHT_CHANGED","value": roundedVal}));
                 stable_val = val
         elif state == State.STABLE:

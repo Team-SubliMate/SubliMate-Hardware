@@ -1,8 +1,9 @@
 import websocket
 import fileinput
 import json
+import ssl
 
-ws = websocket.create_connection("ws://localhost:8080")
+ws = websocket.create_connection("wss://localhost:8080", sslopt={"cert_reqs": ssl.CERT_NONE})
 
 for line in fileinput.input():
     try:
