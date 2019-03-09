@@ -4,6 +4,9 @@ import signal
 import sys
 import websocket
 import json
+
+from argparse
+
 try:
         import thread
 except ImportError:
@@ -35,7 +38,8 @@ class State(Enum):
 
 def cleanAndExit(signal, frame):
     print "Cleaning up..."
-    f.close()
+    if output:
+        f.close()
     GPIO.cleanup()
     ws.close()
     print "Done"
@@ -52,23 +56,40 @@ hx.set_reference_unit(-23.4)
 hx.reset()
 hx.tare()
 
-counter = 0
-prev_val = 0
-alpha = 0.7
-val = 0
+# Initialize the various parameters
+parser = argparse.ArgumentParser()
+parser.add_argument("-a", "--alpha", type=float, default=0.5 help="Alpha value to be used for exponential smoothing")
+parser.add_option("-s", "--stability", type=int, default=10 help="Number of samples to use to determine stability")
+parser.add_option("-t1", "--measure", type=int, default=10 help="Threshold used to determine when we transition to MEASURE state")
+parser.add_option("-t2", "--change", type=int, default=50 help="Threshold used to determine what is considered a significant change")
+parser.add_option("-t3", "--accuracy", type=int, default=5 help="The acceptable error range for measurements")
+parser.add_option("-o", "--output", action="store_true", default=False help="Print output to a file. Useful for statistics gathering")
+parser.add_option("-v", "--verbose", action="store_true", default=False help="Output each measurement to the console")
+args = parser.parse_args()
+
+alpha = args.alpha
+stability_num = args.stability
+threshold_1 = args.measure
+threshold_2 = args.change
+threshold_3 = args.accuracy
+verbose = args.verbose
+output = args.output
+
 beta = 1 - alpha
 
-stability_num = 10
-threshold_1 = 10
-threshold_2 = 50
-threshold_3 = 5
-
+# Initialize the system
+val = 0
+counter = 0
+prev_val = 0
 state = State.STABLE
 values = []
 stable_val = 0
 start_time = 0
-f = open("%f_%d_%d_%d_%d.csv" % (alpha, stability_num, threshold_1, threshold_2, threshold_3), "w")
-f.write("Weight Change Measured (g), Time taken to measure (s)\n")
+
+#Write timing and weight measurements to a file
+if output:
+    f = open("%f_%d_%d_%d_%d.csv" % (alpha, stability_num, threshold_1, threshold_2, threshold_3), "w")
+    f.write("Weight Change Measured (g), Time taken to measure (s)\n")
 print "Ready"
 
 while True:
@@ -76,40 +97,47 @@ while True:
         prev_val = val
         weight = hx.get_weight(1)
         val = alpha * prev_val + beta * weight
-        #prev_val = val
-        #print val
-        #print round(val/10)*10
+        
+        # Print measured value to the console
+        if verbose:
+            print val
 
         hx.power_down()
         hx.power_up()
-        #time.sleep(0.5)
 
-        if state == State.MEASURE:
-            if(len(values) >= stability_num):
-                values.pop(0)
+        #populate the initial set of numbers
+        if( len(values) < stability_num ):
             values.append(val)
-            if(len(values) >= stability_num):
-                state = State.STABLE
-                for v in values:
-                    if abs(v - val) > threshold_3:
-                        state = State.MEASURE
-            if state == State.STABLE:
-                roundedVal = ((val - stable_val)/10)*10
-                if abs(roundedVal) > threshold_2:
-                    counter += 1
-                    print "%d" % counter 
-                    f.write("%f, %f\n" % (abs(roundedVal), time.time() - start_time))
-                    ws.send(json.dumps({"type": "WEIGHT_CHANGED","value": roundedVal}));
-                    #print "WEIGHT_CHANGED"
-                    #print time.time() - start_time
-                    #print roundedVal
+            continue
+        
+        if state == State.MEASURE:
+            #add the new value
+            values.pop(0)
+            values.append(val)
+            
+            #if any values are too far from our measurement continue measuring
+            state = any( abs(v - val) > threshold_3 for v in values) ? State.MEASURE : State.STABLE
 
-                stable_val = val
-        elif state == State.STABLE:
+            if state == State.STABLE:
+                #check if this change is large enough to qualify as an event
+                if abs(val-stable_val) > threshold_2:
+                    #printing portion
+                    if output:
+                        counter += 1
+                        print "%d" % counter 
+                        f.write("%f, %f\n" % (abs(roundedVal), time.time() - start_time))
+                    ws.send(json.dumps({"type": "WEIGHT_CHANGED","value": roundedVal}));
+                
+                #Store the average value of values
+                stable_val = sum(values)/len(values)
+         
+         elif state == State.STABLE:
+            #if a change in values is large enough, begin measuring
             if abs(prev_val - val) > threshold_1:
                 state = State.MEASURE
                 start_time = time.time()
             else:
-                stable_val = val
+                stable_val = sum(values)/len(values)
+    
     except KeyboardInterrupt, SystemExit:
         cleanAndExit()
