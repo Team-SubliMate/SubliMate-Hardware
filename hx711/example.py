@@ -5,7 +5,7 @@ import sys
 import websocket
 import json
 
-from argparse
+import argparse
 
 try:
         import thread
@@ -57,6 +57,7 @@ hx.reset()
 hx.tare()
 
 # Initialize the various parameters
+"""
 parser = argparse.ArgumentParser()
 parser.add_argument("-a", "--alpha", type=float, default=0.5 help="Alpha value to be used for exponential smoothing")
 parser.add_option("-s", "--stability", type=int, default=10 help="Number of samples to use to determine stability")
@@ -66,14 +67,15 @@ parser.add_option("-t3", "--accuracy", type=int, default=5 help="The acceptable 
 parser.add_option("-o", "--output", action="store_true", default=False help="Print output to a file. Useful for statistics gathering")
 parser.add_option("-v", "--verbose", action="store_true", default=False help="Output each measurement to the console")
 args = parser.parse_args()
+"""
 
-alpha = args.alpha
-stability_num = args.stability
-threshold_1 = args.measure
-threshold_2 = args.change
-threshold_3 = args.accuracy
-verbose = args.verbose
-output = args.output
+alpha = 0.5
+stability_num = 10
+threshold_1 = 10
+threshold_2 = 50
+threshold_3 = 5
+verbose = False
+output = True
 
 beta = 1 - alpha
 
@@ -116,7 +118,7 @@ while True:
             values.append(val)
             
             #if any values are too far from our measurement continue measuring
-            state = any( abs(v - val) > threshold_3 for v in values) ? State.MEASURE : State.STABLE
+            state = State.MEASURE if any( abs(v - val) > threshold_3 for v in values) else State.STABLE
 
             if state == State.STABLE:
                 #check if this change is large enough to qualify as an event
@@ -125,13 +127,13 @@ while True:
                     if output:
                         counter += 1
                         print "%d" % counter 
-                        f.write("%f, %f\n" % (abs(roundedVal), time.time() - start_time))
-                    ws.send(json.dumps({"type": "WEIGHT_CHANGED","value": roundedVal}));
+                        f.write("%f, %f\n" % (val-stable_val, time.time() - start_time))
+                    ws.send(json.dumps({"type": "WEIGHT_CHANGED","value": val-stable_val}));
                 
                 #Store the average value of values
                 stable_val = sum(values)/len(values)
          
-         elif state == State.STABLE:
+        elif state == State.STABLE:
             #if a change in values is large enough, begin measuring
             if abs(prev_val - val) > threshold_1:
                 state = State.MEASURE
