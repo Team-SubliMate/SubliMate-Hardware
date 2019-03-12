@@ -5,8 +5,6 @@ import sys
 import websocket
 import json
 
-import argparse
-
 try:
         import thread
 except ImportError:
@@ -56,26 +54,13 @@ hx.set_reference_unit(-23.4)
 hx.reset()
 hx.tare()
 
-# Initialize the various parameters
-"""
-parser = argparse.ArgumentParser()
-parser.add_argument("-a", "--alpha", type=float, default=0.5 help="Alpha value to be used for exponential smoothing")
-parser.add_option("-s", "--stability", type=int, default=10 help="Number of samples to use to determine stability")
-parser.add_option("-t1", "--measure", type=int, default=10 help="Threshold used to determine when we transition to MEASURE state")
-parser.add_option("-t2", "--change", type=int, default=50 help="Threshold used to determine what is considered a significant change")
-parser.add_option("-t3", "--accuracy", type=int, default=5 help="The acceptable error range for measurements")
-parser.add_option("-o", "--output", action="store_true", default=False help="Print output to a file. Useful for statistics gathering")
-parser.add_option("-v", "--verbose", action="store_true", default=False help="Output each measurement to the console")
-args = parser.parse_args()
-"""
-
-alpha = 0.5
+alpha = 0.6
 stability_num = 10
 threshold_1 = 10
 threshold_2 = 50
-threshold_3 = 5
+threshold_3 = 4
 verbose = False
-output = True
+output = False
 
 beta = 1 - alpha
 
@@ -112,11 +97,10 @@ while True:
             values.append(val)
             continue
         
+        values.pop(0)
+        values.append(val)
+
         if state == State.MEASURE:
-            #add the new value
-            values.pop(0)
-            values.append(val)
-            
             #if any values are too far from our measurement continue measuring
             state = State.MEASURE if any( abs(v - val) > threshold_3 for v in values) else State.STABLE
 
@@ -140,6 +124,5 @@ while True:
                 start_time = time.time()
             else:
                 stable_val = sum(values)/len(values)
-    
     except KeyboardInterrupt, SystemExit:
         cleanAndExit()
